@@ -43,7 +43,7 @@ def extract_layer_peak_power(radar_ds, layer_twtt, margin_twtt):
     return peak_twtt, peak_power
 
 #     )
-def extract_basal_echo_power(stac_item, layer, coord, margin_twtt):
+def extract_basal_echo_power(stac_item, layer, coord, margin_twtt, opr):
     frame = opr.load_frame(stac_item)
     frame = xopr.radar_util.add_along_track(frame)
 
@@ -70,44 +70,50 @@ def crossover_echo_power(intersections_radio, stac_items_df):
     margin_twtt = 1e-6
     opr = xopr.OPRConnection(cache_dir="radar_cache")
 
-
     for idx, intersect_row in intersections_radio.iterrows():
-        stac_1 = stac_items_df.loc[intersect_row['id_1']].to_dict()
-        stac_2 = stac_items_df.loc[intersect_row['id_2']].to_dict()
+        try:
+            stac_1 = stac_items_df.loc[intersect_row['id_1']].to_dict()
+            stac_2 = stac_items_df.loc[intersect_row['id_2']].to_dict()
 
-        frame_1 = opr.load_frame(stac_1)
-        frame_2 = opr.load_frame(stac_2)
+            frame_1 = opr.load_frame(stac_1)
+            frame_2 = opr.load_frame(stac_2)
 
-        layer_1 = opr.get_layers(frame_1)
-        layer_2 = opr.get_layers(frame_2)
+            layer_1 = opr.get_layers(frame_1)
+            layer_2 = opr.get_layers(frame_2)
 
-        # intersect coordinates
-        x_int, y_int, *_ = intersect_row.geometry.coords[0]
+            x_int, y_int, *_ = intersect_row.geometry.coords[0]
 
-        # get layer object
-        peak_twtt_surf_1, peak_power_surf_1 = extract_basal_echo_power(stac_1, layer_1["standard:surface"], (x_int, y_int), margin_twtt=margin_twtt)
-        peak_twtt_base_1, peak_power_base_1 = extract_basal_echo_power(stac_1, layer_1["standard:bottom"], (x_int, y_int), margin_twtt=margin_twtt)
-        peak_twtt_surf_2, peak_power_surf_2 = extract_basal_echo_power(stac_2, layer_2["standard:surface"], (x_int, y_int), margin_twtt=margin_twtt)
-        peak_twtt_base_2, peak_power_base_2 = extract_basal_echo_power(stac_2, layer_2["standard:bottom"], (x_int, y_int), margin_twtt=margin_twtt)
+            peak_twtt_surf_1, peak_power_surf_1 = extract_basal_echo_power(stac_1, layer_1["standard:surface"], (x_int, y_int), margin_twtt=margin_twtt, opr=opr)
+            peak_twtt_base_1, peak_power_base_1 = extract_basal_echo_power(stac_1, layer_1["standard:bottom"], (x_int, y_int), margin_twtt=margin_twtt, opr=opr)
+            peak_twtt_surf_2, peak_power_surf_2 = extract_basal_echo_power(stac_2, layer_2["standard:surface"], (x_int, y_int), margin_twtt=margin_twtt, opr=opr)
+            peak_twtt_base_2, peak_power_base_2 = extract_basal_echo_power(stac_2, layer_2["standard:bottom"], (x_int, y_int), margin_twtt=margin_twtt, opr=opr)
 
-        # delta
-        dtwtt_1 = peak_twtt_base_1 - peak_twtt_surf_1
-        dtwtt_2 = peak_twtt_base_2 - peak_twtt_surf_2
-        dtpower_1 = peak_power_base_1 - peak_power_surf_1
-        dtpower_2 = peak_power_base_2 - peak_power_surf_2
+            dtwtt_1 = peak_twtt_base_1 - peak_twtt_surf_1
+            dtwtt_2 = peak_twtt_base_2 - peak_twtt_surf_2
+            dtpower_1 = peak_power_base_1 - peak_power_surf_1
+            dtpower_2 = peak_power_base_2 - peak_power_surf_2
 
-        if idx % 10 == 0:
-            print("Processed {} intersections".format(idx))
-            # print("TWTT delta 1:", dtwtt_1)
-            # print("TWTT delta 2:", dtwtt_2)
-            # print("Power delta 1:", dtpower_1)
-            # print("Power delta 2:", dtpower_2)
+        except Exception as e:
+            print(f"  ⚠️  Skipping idx {idx} — {e}")
+            dtwtt_1 = dtwtt_2 = dtpower_1 = dtpower_2 = float("nan")
+            peak_power_surf_1 = peak_power_surf_2 = peak_power_base_1 = peak_power_base_2 = float("nan")
+            peak_twtt_surf_1 = peak_twtt_surf_2 = peak_twtt_base_1 = peak_twtt_base_2 = float("nan")
 
-        # recombine into a geopandas dataframe
+        intersections_radio.loc[idx, "twtt_surface_1"] = peak_twtt_surf_1
+        intersections_radio.loc[idx, "twtt_surface_2"] = peak_twtt_surf_2
+        intersections_radio.loc[idx, "twtt_base_1"] = peak_twtt_base_1
+        intersections_radio.loc[idx, "twtt_base_2"] = peak_twtt_base_2
+
+        intersections_radio.loc[idx, "power_surface_1"] = peak_power_surf_1
+        intersections_radio.loc[idx, "power_surface_2"] = peak_power_surf_2
+        intersections_radio.loc[idx, "power_base_1"] = peak_power_base_1
+        intersections_radio.loc[idx, "power_base_2"] = peak_power_base_2
+
         intersections_radio.loc[idx, "dtwtt_1"] = dtwtt_1
         intersections_radio.loc[idx, "dtwtt_2"] = dtwtt_2
         intersections_radio.loc[idx, "dtpower_1"] = dtpower_1
         intersections_radio.loc[idx, "dtpower_2"] = dtpower_2
+        print(f"Processed intersection {idx}")
 
     return intersections_radio
         
