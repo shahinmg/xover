@@ -17,3 +17,5 @@ sync with uv
 ```
 uv sync
 ```
+
+Link to Connected Data Products Hackdays repo: https://github.com/connected-data-products-hackdays/ideas/issues
