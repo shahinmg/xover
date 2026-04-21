@@ -11,10 +11,9 @@ RUN useradd --create-home --shell /bin/bash --uid ${NB_UID} ${NB_USER}
 WORKDIR ${HOME}
 
 # Build context is the repo root when Dockerfile lives in binder/
-COPY --chown=${NB_USER}:${NB_USER} pyproject.toml uv.lock ./
-COPY --chown=${NB_USER}:${NB_USER} xover/ ./xover/
+COPY --chown=${NB_USER}:${NB_USER} . .
 
 USER ${NB_USER}
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen
 
 ENV PATH="${HOME}/.venv/bin:${PATH}"
